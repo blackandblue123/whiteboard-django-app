@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+    <style>
+        *{font-family:sans-serif;}
+        #settings {
+            display: block;
+            text-align:center;
+        }
+        #paint {
+            border: 1px solid black;
+            background : #ffffff;
+            margin-left: auto;
+            margin-right: auto;
+            display: block;
+        }
+        body {
+            background-color: beige;
+        }
+    </style>
+    <body>
+        <div id="sketch">
+            <canvas id="paint">
+            </canvas>
+        </div>
+        <div id="settings"> Colours
+            <button onclick="getColor('red');">Red</button>
+            <button onclick="getColor('orange');">Orange</button>
+            <button onclick="getColor('yellow');">Yellow</button>
+            <button onclick="getColor('green');">Green</button>
+            <button onclick="getColor('blue');">Blue</button>
+            <button onclick="getColor('violet');">Violet</button>
+            <button onclick="getColor('white');">Eraser</button>
+          </div>
+          
+          <div id="settings"> Brush Size
+            <button onclick="getSize('2');">Small</button>
+            <button onclick="getSize('5');">Med</button>
+            <button onclick="getSize('10');">Large</button>
+            <button onclick="getSize('20');">X Large</button>
+          </div>
+    </body>
+    <script>
+        const drawSocket = new WebSocket(
+            'ws://'
+            + window.location.host
+            + '/ws/draw/'
+        );
+    
+        var canvas = document.getElementById('paint');
+        var ctx = canvas.getContext('2d');
+        
+        var sketch = document.getElementById('sketch');
+        var sketch_style = getComputedStyle(sketch);
+        canvas.width = 500;
+        canvas.height = 250;
+
+        var mouse = {x: 0, y: 0};
+        
+        /* Mouse Capturing Work */
+        canvas.addEventListener('mousemove', function(e) {
+            mouse.x = e.pageX - this.offsetLeft;
+            mouse.y = e.pageY - this.offsetTop;
+        }, false);
+
+        /* Drawing on Paint App */
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+
+        ctx.strokeStyle = "red";
+        function getColor(colour){
+            ctx.strokeStyle = colour;
+            drawSocket.send(JSON.stringify({
+                'color': colour,
+            }));
+        }
+
+        function getSize(size){
+            ctx.lineWidth = size;
+            drawSocket.send(JSON.stringify({
+                'size': size,
+            }));
+        }
+
+        canvas.addEventListener('mousedown', function(e) {
+            canvas.addEventListener('mousemove', onPaint, false);
+            drawSocket.send(JSON.stringify({
+                'mousedown': true,
+            }));
+        }, false);
+        
+        canvas.addEventListener('mouseup', function() {
+            canvas.removeEventListener('mousemove', onPaint, false);
+        }, false);
+        
+        var onPaint = function() {
+            drawSocket.send(JSON.stringify({
+                'x': mouse.x,
+                'y': mouse.y,
+            }));
+        };
+
+        drawSocket.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+            if ("color" in data) {
+                ctx.strokeStyle = data.color;
+            }
+            if ("size" in data) {
+                ctx.lineWidth = data.size;
+            }
+            if(data.mousedown) {
+                ctx.beginPath();
+            } else if (data.x) {
+                ctx.lineTo(data.x, data.y);
+                ctx.stroke();
+            }
+        };
+        drawSocket.onclose = function(e) {
+            console.error('Socket closed unexpectedly');
+        };
+        drawSocket.onopen = function(e) {
+            console.error('Socket open');
+        };
+
+    </script>
+</html>
